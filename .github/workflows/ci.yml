@@ -1,0 +1,35 @@
+name: CI — Sendwe SOS (Mobile)
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'Sendwe SOS mobile/**'
+  pull_request:
+    paths:
+      - 'Sendwe SOS mobile/**'
+
+defaults:
+  run:
+    working-directory: Sendwe SOS mobile
+
+jobs:
+  test:
+    name: Analyse + Tests (Flutter)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Récupérer les dépendances
+        run: flutter pub get
+
+      - name: Analyse statique (dart analyze)
+        run: flutter analyze
+
+      - name: Tests widget
+        run: flutter test
