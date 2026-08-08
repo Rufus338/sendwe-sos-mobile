@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/ws_client.dart';
+import '../../shared/call_phone.dart';
 import '../../shared/sos_map.dart';
 import '../../shared/widgets.dart';
 import 'summary_screen.dart';
@@ -24,6 +25,9 @@ class _TrackEmergencyScreenState extends State<TrackEmergencyScreen> {
   Map<String, dynamic>? _trip;
   String? _status;
   LatLng? _ambulancePosition;
+  LatLng? _patientPosition;
+  String? _driverPhone;
+  DateTime? _ambulanceRecordedAt;
   bool _completed = false;
   bool _cancelled = false;
   WSClient? _ws;
@@ -38,7 +42,12 @@ class _TrackEmergencyScreenState extends State<TrackEmergencyScreen> {
           final lat = (data['lat'] as num?)?.toDouble();
           final lng = (data['lng'] as num?)?.toDouble();
           if (lat != null && lng != null && mounted) {
-            setState(() => _ambulancePosition = LatLng(lat, lng));
+            setState(() {
+              _ambulancePosition = LatLng(lat, lng);
+              final ts = data['recorded_at'] as String?;
+              _ambulanceRecordedAt =
+                  ts != null ? DateTime.tryParse(ts) : DateTime.now();
+            });
           }
         },
         'emergency.status.updated': (data) {
@@ -68,9 +77,26 @@ class _TrackEmergencyScreenState extends State<TrackEmergencyScreen> {
             setState(() {
               _status = view['status'] as String?;
               _ambulancePosition = LatLng(lat, lng);
+              final ts = amb!['location_updated_at'] as String?;
+              _ambulanceRecordedAt =
+                  ts != null ? DateTime.tryParse(ts) : DateTime.now();
             });
           }
         }
+        final phone = amb?['driver_phone'] as String?;
+        if (phone != null && phone.isNotEmpty && mounted) {
+          setState(() => _driverPhone = phone);
+        }
+      }
+      // Position du patient : depuis le détail de la demande
+      final emergency =
+          await apiClient.get('/emergencies/${widget.emergencyId}')
+              as Map<String, dynamic>;
+      final pickup = emergency['pickup_location'] as Map<String, dynamic>?;
+      if (pickup != null && mounted) {
+        final lat = (pickup['lat'] as num).toDouble();
+        final lng = (pickup['lng'] as num).toDouble();
+        setState(() => _patientPosition = LatLng(lat, lng));
       }
     } catch (_) {
       /* ignore */
@@ -119,6 +145,13 @@ class _TrackEmergencyScreenState extends State<TrackEmergencyScreen> {
     return !cutOff.contains(s);
   }
 
+  /// Position non actualisée depuis plus de 30 s (section 18).
+  bool get _isPositionStale {
+    final ts = _ambulanceRecordedAt;
+    if (ts == null) return false;
+    return DateTime.now().difference(ts).inSeconds > 30;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,12 +166,18 @@ class _TrackEmergencyScreenState extends State<TrackEmergencyScreen> {
                       ? StatusBadge(_status!)
                       : const LoadingView(),
                 ),
-                // Carte : position de l'ambulance (section 19)
+                // Carte : position de l'ambulance + patient (section 19)
                 Expanded(
                   child: _ambulancePosition != null
                       ? SOSMap(
                           center: _ambulancePosition,
                           markers: [
+                            if (_patientPosition != null)
+                              MapMarkerData(
+                                id: 'patient',
+                                point: _patientPosition!,
+                                color: patientMarkerColor,
+                              ),
                             MapMarkerData(
                               id: 'ambulance',
                               point: _ambulancePosition!,
@@ -163,6 +202,30 @@ class _TrackEmergencyScreenState extends State<TrackEmergencyScreen> {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
+                        // Badge de fraîcheur : position non actualisée > 30 s
+                        if (_isPositionStale)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(8),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.pending.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Position non actualisée depuis plus de 30 s',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: AppColors.pending,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        // Appeler l'ambulancier (P4) — numéro masqué par défaut
+                        if (_driverPhone != null) ...[
+                          CallButton(phone: _driverPhone!),
+                          const SizedBox(height: 8),
+                        ],
                         if (_canCancel)
                           OutlinedButton(
                             onPressed: () => showDialog(

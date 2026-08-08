@@ -68,7 +68,11 @@ class LocationService {
         await Geolocator.requestPermission();
       }
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(catch (_) {
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+    } catch (_) {
       return null;
     }
   }

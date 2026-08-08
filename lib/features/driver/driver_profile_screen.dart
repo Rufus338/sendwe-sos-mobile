@@ -53,6 +53,84 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     }
   }
 
+  Future<void> _changePassword() async {
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Changer mon mot de passe'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: oldCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Mot de passe actuel'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: newCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Nouveau mot de passe'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Confirmer le nouveau mot de passe',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final old = oldCtrl.text.trim();
+              final nw = newCtrl.text;
+              if (old.isEmpty || nw.length < 8 || nw != confCtrl.text) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Vérifiez votre mot de passe actuel, que le nouveau fait ≥ 8 '
+                      'caractères et que la confirmation correspond',
+                    ),
+                  ),
+                );
+                return;
+              }
+              try {
+                await apiClient.patch(
+                  '/auth/change-password',
+                  body: {'old_password': old, 'new_password': nw},
+                );
+                Navigator.pop(ctx, true);
+              } catch (e) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('Erreur : $e')),
+                );
+              }
+            },
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Mot de passe modifié')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = _profile;
@@ -97,9 +175,19 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 const Divider(),
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: OutlinedButton(
-                    onPressed: _logout,
-                    child: const Text('Se déconnecter'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OutlinedButton(
+                        onPressed: _changePassword,
+                        child: const Text('Changer mon mot de passe'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: _logout,
+                        child: const Text('Se déconnecter'),
+                      ),
+                    ],
                   ),
                 ),
               ],

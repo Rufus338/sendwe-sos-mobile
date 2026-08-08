@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/ws_client.dart';
+import '../../shared/call_phone.dart';
 import 'track_emergency_screen.dart';
 
 class SearchingScreen extends StatefulWidget {
@@ -53,6 +54,9 @@ class _SearchingScreenState extends State<SearchingScreen> {
         setState(() {
           _failed = true;
           _failReason = 'Aucune ambulance disponible actuellement';
+          // Décision 6 : numéro de secours, masqué si non configuré
+          final phone = data['emergency_backup_phone'] as String?;
+          _backupPhone = (phone != null && phone.isNotEmpty) ? phone : null;
         });
       }
     } catch (_) {
@@ -119,11 +123,7 @@ class _SearchingScreenState extends State<SearchingScreen> {
               // Numéro de secours : affiché UNIQUEMENT s'il est configuré (décision 6)
               if (_backupPhone != null && _backupPhone!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.phone),
-                  label: Text('Appeler le secours : $_backupPhone'),
-                ),
+                CallButton(phone: _backupPhone!, showNumber: true),
               ],
               const SizedBox(height: 16),
               ElevatedButton(

@@ -10,6 +10,7 @@ import '../../core/ws_client.dart';
 import 'driver_history_screen.dart';
 import 'driver_profile_screen.dart';
 import 'incoming_request_screen.dart';
+import 'active_trip_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -21,6 +22,7 @@ class DriverHomeScreen extends StatefulWidget {
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool? _isAvailable;
   Map<String, dynamic>? _profile;
+  Map<String, dynamic>? _activeTrip;
   bool _loading = true;
   String? _error;
   WSClient? _ws;
@@ -46,6 +48,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final ambulance = data['ambulance'] as Map<String, dynamic>?;
       setState(() {
         _profile = data;
+        _activeTrip = data['active_trip'] as Map<String, dynamic>?;
         _isAvailable = data['is_available'] as bool;
         if (ambulance == null)
           _error =
@@ -115,6 +118,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final ambulance = _profile?['ambulance'] as Map<String, dynamic>?;
+    final hasActiveTrip = _activeTrip != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -136,53 +140,80 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
         ],
       ),
-      body: Padding(
+      body: ListView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        children: [
+          // Bandeau intervention active (D1) -> ouvre D3
+          if (hasActiveTrip) ...[
             Card(
-              child: SwitchListTile(
-                value: _isAvailable ?? false,
-                onChanged: ambulance == null ? null : _toggleAvailability,
-                title: Text(
-                  _isAvailable == true ? 'Disponible' : 'Indisponible',
+              color: AppColors.active.withValues(alpha: 0.1),
+              child: ListTile(
+                leading: const Icon(
+                  Icons.emergency,
+                  color: AppColors.active,
                 ),
+                title: const Text('Intervention en cours'),
                 subtitle: Text(
-                  _isAvailable == true
-                      ? 'Position GPS envoyée toutes les 10 s'
-                      : 'Activez pour recevoir les demandes',
+                  ((_activeTrip!['status'] as String?) ?? 'En cours')
+                      .replaceAll('_', ' '),
                 ),
-                secondary: Icon(
-                  _isAvailable == true
-                      ? Icons.check_circle
-                      : Icons.pause_circle,
-                  color: _isAvailable == true
-                      ? AppColors.success
-                      : AppColors.offline,
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ActiveTripScreen(
+                      tripId: _activeTrip!['id'] as String,
+                    ),
+                  ),
                 ),
               ),
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: AppColors.danger)),
-            ],
             const SizedBox(height: 16),
-            if (ambulance != null)
-              Card(
-                child: ListTile(
-                  leading: const Icon(
-                    Icons.local_hospital,
-                    color: AppColors.active,
-                  ),
-                  title: const Text('Votre véhicule'),
-                  subtitle: Text(
-                    '${ambulance['plate_number']} — ${ambulance['model']}',
-                  ),
+          ],
+          Card(
+            child: SwitchListTile(
+              value: _isAvailable ?? false,
+              onChanged: (ambulance == null || hasActiveTrip)
+                  ? null
+                  : _toggleAvailability,
+              title: Text(
+                _isAvailable == true ? 'Disponible' : 'Indisponible',
+              ),
+              subtitle: Text(
+                hasActiveTrip
+                    ? 'Terminez l\'intervention en cours avant de basculer'
+                    : _isAvailable == true
+                        ? 'Position GPS envoyée toutes les 10 s'
+                        : 'Activez pour recevoir les demandes',
+              ),
+              secondary: Icon(
+                _isAvailable == true
+                    ? Icons.check_circle
+                    : Icons.pause_circle,
+                color: _isAvailable == true
+                    ? AppColors.success
+                    : AppColors.offline,
+              ),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(_error!, style: const TextStyle(color: AppColors.danger)),
+          ],
+          const SizedBox(height: 16),
+          if (ambulance != null)
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.local_hospital,
+                  color: AppColors.active,
+                ),
+                title: const Text('Votre véhicule'),
+                subtitle: Text(
+                  '${ambulance['plate_number']} — ${ambulance['model']}',
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

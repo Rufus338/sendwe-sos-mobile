@@ -45,6 +45,9 @@ dependencies:
   geolocator: ^13.0.2
   permission_handler: ^11.3.1
 
+  # Appels téléphoniques natifs (P3 secours, P4 ambulancier, D3 bénéficiaire)
+  url_launcher: ^6.3.1
+
   # Navigation et état
   provider: ^6.1.2
 

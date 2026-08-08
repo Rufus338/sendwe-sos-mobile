@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../core/token_storage.dart';
 import '../auth/login_screen.dart';
+import '../settings/settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -74,6 +75,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Suppression de compte — double confirmation (saisie du mot-clé) + anonymisation backend.
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer mon compte'),
+        content: const Text(
+          'Votre compte et vos données personnelles seront supprimés. '
+          'Cette action est définitive. Taper SUPPRIMER pour confirmer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continuer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Confirmer la suppression'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(labelText: 'Taper SUPPRIMER'),
+            textCapitalization: TextCapitalization.characters,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: controller.text.trim().toUpperCase() == 'SUPPRIMER'
+                  ? () => Navigator.pop(ctx, true)
+                  : null,
+              child: const Text('Supprimer définitivement'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    try {
+      await apiClient.delete('/users/me');
+      await TokenStorage.clear();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,6 +178,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   OutlinedButton(
                     onPressed: _logout,
                     child: const Text('Se déconnecter'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    ),
+                    icon: const Icon(Icons.settings_outlined),
+                    label: const Text('Paramètres'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: _deleteAccount,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    child: const Text('Supprimer mon compte'),
                   ),
                 ],
               ),

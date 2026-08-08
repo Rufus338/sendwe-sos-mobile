@@ -28,6 +28,20 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
   void initState() {
     super.initState();
     _locate();
+    // P1 : si une demande est déjà active, rediriger vers le suivi (section 9.B)
+    _checkActiveOnLoad();
+  }
+
+  Future<void> _checkActiveOnLoad() async {
+    final active = await _activeEmergency();
+    if (!mounted || active == null) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => TrackEmergencyScreen(
+          emergencyId: active['id'] as String,
+        ),
+      ),
+    );
   }
 
   Future<void> _locate() async {

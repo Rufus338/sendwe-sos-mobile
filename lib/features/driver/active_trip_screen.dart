@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/ws_client.dart';
+import '../../shared/call_phone.dart';
 import '../../shared/sos_map.dart';
 import '../../shared/widgets.dart';
 
@@ -120,6 +121,10 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final status = (_trip?['status'] as String?) ?? '';
     final action = _nextAction[status];
     final beneficiary = _trip?['beneficiary_name'] as String?;
+    final beneficiaryPhone = _trip?['beneficiary_phone'] as String?;
+    final requesterName = _trip?['requester_name'] as String?;
+    final requesterPhone = _trip?['requester_phone'] as String?;
+    final isThirdParty = beneficiary != null && beneficiary.isNotEmpty;
     final reason = (_trip?['reason_category'] as String? ?? '').replaceAll(
       '_',
       ' ',
@@ -184,14 +189,44 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Card(
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.person,
-                        color: AppColors.active,
-                      ),
-                      title: Text(beneficiary ?? 'Demandeur'),
-                      subtitle: Text('Motif : $reason'),
-                      trailing: const Icon(Icons.phone),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(
+                            Icons.person,
+                            color: AppColors.active,
+                          ),
+                          title: Text(beneficiary ?? requesterName ?? 'Demandeur'),
+                          subtitle: Text('Motif : $reason'),
+                          trailing: isThirdParty && beneficiaryPhone != null
+                              ? CallButton(
+                                  phone: beneficiaryPhone,
+                                  compact: true,
+                                )
+                              : null,
+                        ),
+                        // Appel du demandeur : discret, si différent du bénéficiaire
+                        if (isThirdParty &&
+                            requesterPhone != null &&
+                            requesterPhone.isNotEmpty) ...[
+                          const Divider(height: 1),
+                          ListTile(
+                            dense: true,
+                            leading: const Icon(
+                              Icons.person_outline,
+                              size: 20,
+                            ),
+                            title: Text(
+                              requesterName ?? 'Demandeur',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            trailing: CallButton(
+                              phone: requesterPhone,
+                              compact: true,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -209,23 +244,81 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   }
 
   void _reportProblem() {
+    String? selected;
+    final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Signaler un problème'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Text('Ambulance en panne\nPatient introuvable\nFausse alerte'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Signaler un problème'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RadioListTile<String>(
+                title: const Text('Ambulance en panne'),
+                value: 'FAILED',
+                groupValue: selected,
+                onChanged: (v) => setState(() => selected = v),
+              ),
+              RadioListTile<String>(
+                title: const Text('Patient introuvable'),
+                value: 'FAILED',
+                groupValue: selected,
+                onChanged: (v) => setState(() => selected = v),
+              ),
+              RadioListTile<String>(
+                title: const Text('Fausse alerte'),
+                value: 'CANCELLED',
+                groupValue: selected,
+                onChanged: (v) => setState(() => selected = v),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                maxLength: 300,
+                decoration: const InputDecoration(
+                  labelText: 'Commentaire (obligatoire)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: selected != null && controller.text.trim().isNotEmpty
+                  ? () {
+                      final target = selected!;
+                      Navigator.pop(ctx);
+                      _closeWithProblem(target, controller.text.trim());
+                    }
+                  : null,
+              child: const Text('Envoyer'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fermer'),
-          ),
-        ],
       ),
     );
+  }
+
+  Future<void> _closeWithProblem(String status, String reason) async {
+    try {
+      await apiClient.patch(
+        '/trips/${widget.tripId}/status',
+        body: {'status': status, 'reason': reason},
+      );
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
   }
 }
