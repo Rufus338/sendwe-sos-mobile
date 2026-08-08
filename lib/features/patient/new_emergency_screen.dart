@@ -2,9 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../shared/sos_map.dart';
 import 'searching_screen.dart';
 
 class NewEmergencyScreen extends StatefulWidget {
@@ -56,6 +58,25 @@ class _NewEmergencyScreenState extends State<NewEmergencyScreen> {
       setState(() => _error = 'Impossible de déterminer votre position');
     } finally {
       if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  /// P2 — pickup_location éditable : pin déplaçable sur carte interactive.
+  Future<void> _pickOnMap() async {
+    if (_lat == null || _lng == null) return;
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => _LocationPickerScreen(
+          initial: LatLng(_lat!, _lng!),
+        ),
+      ),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _lat = picked.latitude;
+        _lng = picked.longitude;
+        _error = null;
+      });
     }
   }
 
@@ -134,26 +155,48 @@ class _NewEmergencyScreenState extends State<NewEmergencyScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Localisation (pré-remplie par GPS)
+            // Localisation (pré-remplie par GPS, éditable — P2)
             Card(
-              child: ListTile(
-                leading: _locating
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.location_on, color: AppColors.active),
-                title: const Text('Position'),
-                subtitle: Text(
-                  _lat != null
-                      ? '${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}'
-                      : 'GPS indisponible',
-                ),
-                trailing: TextButton(
-                  onPressed: _locate,
-                  child: const Text('Réessayer'),
-                ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: _locating
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.location_on, color: AppColors.active),
+                    title: const Text('Position'),
+                    subtitle: Text(
+                      _lat != null
+                          ? '${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}'
+                          : 'GPS indisponible',
+                    ),
+                    trailing: TextButton(
+                      onPressed: _locate,
+                      child: const Text('Réessayer'),
+                    ),
+                  ),
+                  if (_lat != null)
+                    ListTile(
+                      dense: true,
+                      leading: const Icon(
+                        Icons.edit_location_alt,
+                        size: 20,
+                        color: AppColors.active,
+                      ),
+                      title: const Text(
+                        'Choisir sur la carte',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        size: 20,
+                      ),
+                      onTap: _pickOnMap,
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -225,6 +268,83 @@ class _NewEmergencyScreenState extends State<NewEmergencyScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Plein écran de sélection du point de prise en charge (P2).
+/// Le pin reste fixe au centre ; on déplace la carte pour ajuster la position.
+class _LocationPickerScreen extends StatefulWidget {
+  final LatLng initial;
+  const _LocationPickerScreen({required this.initial});
+
+  @override
+  State<_LocationPickerScreen> createState() => _LocationPickerScreenState();
+}
+
+class _LocationPickerScreenState extends State<_LocationPickerScreen> {
+  LatLng? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initial;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _selected;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Position de l\'intervention'),
+        actions: [
+          if (selected != null)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(selected),
+              child: const Text('Valider'),
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SOSPointPicker(
+              initial: widget.initial,
+              onChanged: (p) => setState(() => _selected = p),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 18,
+                    color: AppColors.mutedForeground,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      selected != null
+                          ? '${selected.latitude.toStringAsFixed(5)}, '
+                                '${selected.longitude.toStringAsFixed(5)}'
+                          : 'Déplacez la carte pour positionner le pin',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(context).pop(selected),
+                    icon: const Icon(Icons.check),
+                    label: const Text('Confirmer'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

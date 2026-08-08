@@ -73,6 +73,79 @@ class SOSMap extends StatelessWidget {
   }
 }
 
+/// Carte de sélection d'un point : le pin est fixé au centre, on déplace la
+/// carte pour ajuster la position (section P2 — pickup_location éditable).
+class SOSPointPicker extends StatefulWidget {
+  final LatLng? initial;
+  final ValueChanged<LatLng> onChanged;
+
+  const SOSPointPicker({
+    super.key,
+    this.initial,
+    required this.onChanged,
+  });
+
+  @override
+  State<SOSPointPicker> createState() => _SOSPointPickerState();
+}
+
+class _SOSPointPickerState extends State<SOSPointPicker> {
+  late MapController _mapController;
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  void _onMove() {
+    final center = _mapController.camera.center;
+    widget.onChanged(center);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initial =
+        widget.initial ?? const LatLng(-11.6647, 27.4794); // Lubumbashi
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: initial,
+            initialZoom: 14,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all & ~InteractiveFlag.doubleTapZoom,
+            ),
+            onPositionChanged: (_, __) => _onMove(),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.sendwe.sendwe_sos',
+            ),
+          ],
+        ),
+        // Pin central fixe (le point sélectionné = centre de la carte)
+        const IgnorePointer(
+          child: Icon(
+            Icons.location_pin,
+            size: 44,
+            color: AppColors.danger,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Icône de position du patient (bleu, section 19).
 const patientMarkerColor = AppColors.active;
 
