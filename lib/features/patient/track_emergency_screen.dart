@@ -37,6 +37,7 @@ class _TrackEmergencyScreenState extends State<TrackEmergencyScreen> {
     super.initState();
     _load();
     _ws = WSClient(
+      onReconnect: _load,
       handlers: {
         'ambulance.location.updated': (data) {
           final lat = (data['lat'] as num?)?.toDouble();

@@ -33,6 +33,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     super.initState();
     _load();
     _ws = WSClient(
+      // Resynchronisation REST à la reconnexion (section 16.1)
+      onReconnect: _load,
       handlers: {
         'emergency.assigned': (data) => _openIncoming(data),
         'emergency.cancelled': (_) => _load(),
@@ -71,7 +73,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       MaterialPageRoute(builder: (_) => IncomingRequestScreen(tripId: tripId)),
     );
   }
-
   Future<void> _toggleAvailability(bool value) async {
     setState(() => _error = null);
 

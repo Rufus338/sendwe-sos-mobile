@@ -16,8 +16,9 @@ class WSClient {
 
   final Map<String, void Function(Map<String, dynamic>)> handlers;
   final void Function(bool connected)? onStatusChange;
+  final void Function()? onReconnect;
 
-  WSClient({required this.handlers, this.onStatusChange});
+  WSClient({required this.handlers, this.onStatusChange, this.onReconnect});
 
   static String get _baseWsUrl {
     const apiUrl = String.fromEnvironment(
@@ -38,7 +39,11 @@ class WSClient {
       _channel = WebSocketChannel.connect(
         Uri.parse('$_baseWsUrl?token=$token'),
       );
+      // Connexion établie : réinitialiser le backoff exponentiel (section 16.1)
+      _backoff = const Duration(seconds: 1);
       onStatusChange?.call(true);
+      // Resynchronisation REST à (re)connexion (section 16.1)
+      onReconnect?.call();
       _channel!.stream.listen(
         _onMessage,
         onDone: _onClose,

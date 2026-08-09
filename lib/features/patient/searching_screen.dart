@@ -30,6 +30,7 @@ class _SearchingScreenState extends State<SearchingScreen> {
   void initState() {
     super.initState();
     _ws = WSClient(
+      onReconnect: _poll,
       handlers: {
         'emergency.accepted': (_) => _goToTrack(),
         'emergency.failed': (data) => setState(() {
