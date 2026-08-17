@@ -22,7 +22,6 @@ class TrackEmergencyScreen extends StatefulWidget {
 }
 
 class _TrackEmergencyScreenState extends State<TrackEmergencyScreen> {
-  Map<String, dynamic>? _trip;
   String? _status;
   LatLng? _ambulancePosition;
   LatLng? _patientPosition;

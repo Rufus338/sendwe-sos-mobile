@@ -55,7 +55,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() {
         _items = data['items'] as List<dynamic>;
         _page = data['page'] as int;
-        _hasMore = (_page as int) < (data['pages'] as int);
+        _hasMore = _page < (data['pages'] as int);
       });
     } catch (_) {
       final prefs = await SharedPreferences.getInstance();
@@ -82,7 +82,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() {
         _items = [..._items, ...(data['items'] as List<dynamic>)];
         _page = data['page'] as int;
-        _hasMore = (_page as int) < (data['pages'] as int);
+        _hasMore = _page < (data['pages'] as int);
       });
     } catch (_) {
       /* ignore */
